@@ -21,6 +21,8 @@ class Openni2_grabber {
 
         void init_depth_stream();
 
+        void init_rgb_stream();
+
         void retrieve(Mat &f, int sensor_type = 0);
 
         enum {RGB_IMAGE, DEPTH_IMAGE, IR_IMAGE};
@@ -35,9 +37,13 @@ class Openni2_grabber {
 
         void read_depth_frame();
 
+        void read_color_frame();
+
         void read_frame_from_stream(VideoStream *vstream, VideoFrameRef *vfref);
 
         void parse_uint16_data(Mat &f, VideoFrameRef  *vfref);
+
+        void parse_uchar_data(Mat &f, VideoFrameRef *vfref);
 
         Device *device_;
         VideoStream *depth_stream_;
