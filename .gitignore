@@ -1,0 +1,3 @@
+build*/
+not_to_build
+*.json
