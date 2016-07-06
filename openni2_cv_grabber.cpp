@@ -109,6 +109,7 @@ void Openni2_grabber::retrieve(Mat &f, int sensor_type){
             read_color_frame();
             if(!color_frame_->isValid()) break;
             parse_uchar_data(f, color_frame_);
+            cvtColor(f, f, CV_RGB2BGR);
             break;
     }
 }
