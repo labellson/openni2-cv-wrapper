@@ -11,6 +11,12 @@
 using namespace std;
 using namespace cv;
 
+struct Frame {
+    public:
+        Mat f;
+        String f_name;
+};
+
 bool SIGINT_RAISED = false;
 
 void sigint_handler(int s){
@@ -25,12 +31,11 @@ int main(int argc, char **argv){
     grabber->init_depth_stream();
     grabber->init_rgb_stream();
 
-    Mat depth_frame, rgb_frame;
-    queue<Mat*> color_buff, depth_buff;
+    queue<Frame> color_buff, depth_buff;
     int counter_depth = -1, counter_color = -1;
     bool go = true;
     
-    #pragma omp parallel shared(go, color_buff, depth_buff), num_threads(8)
+    #pragma omp parallel shared(go, color_buff, depth_buff), num_threads(3)
     {
         while(go){
             #pragma omp sections nowait
@@ -38,42 +43,53 @@ int main(int argc, char **argv){
                 #pragma omp section
                 {
                     if(!SIGINT_RAISED){
+                        Mat depth_frame, rgb_frame;
                         grabber->retrieve(depth_frame, Openni2_grabber::DEPTH_IMAGE);
                         grabber->retrieve(rgb_frame);
 
+                        chrono::system_clock::time_point now = std::chrono::system_clock::now();
+                        time_t time = std::chrono::system_clock::to_time_t(now);
+                        chrono::milliseconds  ms = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()) -
+                        std::chrono::duration_cast<std::chrono::seconds>(now.time_since_epoch());
+
+                        stringstream t_sst, rgb_sst, depth_sst;
+                        t_sst << put_time(localtime(&time), "%H_%M_%S_") << setfill('0') << setw(3) << ms.count();
+                        rgb_sst << "rgb" << t_sst.str() << ".png";
+                        depth_sst << "depth" << t_sst.str() << ".pgm";
+                        struct Frame srgb, sdepth;
+                        srgb.f = rgb_frame;
+                        sdepth.f = depth_frame;
+                        srgb.f_name = rgb_sst.str();
+                        sdepth.f_name = depth_sst.str();
+
+
                         #pragma omp critical(buffer)
                         {
-                            depth_buff.push(&depth_frame);
-                            color_buff.push(&rgb_frame);
+                            depth_buff.push(sdepth);
+                            color_buff.push(srgb);
                         }
                     }
                 }
 
                 #pragma omp section
                 {
-                    chrono::system_clock::time_point now = std::chrono::system_clock::now();
-                    time_t time = std::chrono::system_clock::to_time_t(now);
-                    chrono::milliseconds  ms = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()) -
-                    std::chrono::duration_cast<std::chrono::seconds>(now.time_since_epoch());
 
                     if(!depth_buff.empty()){
                         //Write the image
-                        stringstream ss;
-                        //ss << "depth_" << ++counter_depth << ".png";
-                        ss << "depth_" << put_time(localtime(&time), "%H:%M:%S:") << ms.count() << ".png";
-                        imwrite(ss.str(), *(depth_buff.front()));
-                        //#pragma omp atomic
-                        depth_buff.pop();
+                        imwrite(depth_buff.front().f_name, depth_buff.front().f);
+                        #pragma omp critical(buffer)
+                        {
+                            depth_buff.pop();
+                        }
                     }
 
                     if(!color_buff.empty()){
                         //Write again
-                        stringstream ss;
-                        //ss << "rgb_" << ++counter_color << ".png";
-                        ss << "rgb_" << put_time(localtime(&time), "%H:%M:%S:") << ms.count() << ".png";
-                        imwrite(ss.str(), *(color_buff.front()));
-                        //#pragma omp atomic
-                        color_buff.pop();
+                        imwrite(color_buff.front().f_name, color_buff.front().f);
+                        #pragma omp critical(buffer)
+                        {
+                            color_buff.pop();
+                        }
                     }
                     if(SIGINT_RAISED && depth_buff.empty() && color_buff.empty()) go = false;
                 }
