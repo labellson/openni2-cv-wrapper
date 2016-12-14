@@ -74,22 +74,26 @@ int main(int argc, char **argv){
                 #pragma omp section
                 {
 
-                    if(!depth_buff.empty()){
-                        //Write the image
-                        imwrite(depth_buff.front().f_name, depth_buff.front().f);
-                        #pragma omp critical(buffer)
-                        {
-                            depth_buff.pop();
+                    try {
+                        if(!depth_buff.empty()){
+                            //Write the image
+                            imwrite(depth_buff.front().f_name, depth_buff.front().f);
+                            #pragma omp critical(buffer)
+                            {
+                                depth_buff.pop();
+                            }
                         }
-                    }
 
-                    if(!color_buff.empty()){
-                        //Write again
-                        imwrite(color_buff.front().f_name, color_buff.front().f);
-                        #pragma omp critical(buffer)
-                        {
-                            color_buff.pop();
+                        if(!color_buff.empty()){
+                            //Write again
+                            imwrite(color_buff.front().f_name, color_buff.front().f);
+                            #pragma omp critical(buffer)
+                            {
+                                color_buff.pop();
+                            }
                         }
+                    } catch(int e){
+                        cout << "Danger: Unexpected exception!!" << endl;
                     }
                     if(SIGINT_RAISED && depth_buff.empty() && color_buff.empty()) go = false;
                 }
